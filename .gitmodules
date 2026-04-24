@@ -1,6 +1,8 @@
 [submodule "frontend"]
 	path = frontend
 	url = https://github.com/gamr416/robbo_personal_account_frontend.git
+	branch = main
 [submodule "backend"]
 	path = backend
 	url = https://github.com/gamr416/robbo_personal_account_backend.git
+	branch = main
