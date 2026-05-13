@@ -1,0 +1,25 @@
+name: robbo_projects_db
+
+services:
+  postgres:
+    image: postgres:13
+    container_name: robbo_projects_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-robbo_projects}
+      POSTGRES_USER: ${POSTGRES_USER:-robbo_projects}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-robbo_projects_change_me}
+    ports:
+      - "${ROBBO_PROJECTS_DB_PORT:-5433}:5432"
+    volumes:
+      - robbo_projects_pgdata:/var/lib/postgresql/data
+      - ./init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+volumes:
+  robbo_projects_pgdata:

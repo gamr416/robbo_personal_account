@@ -1,0 +1,50 @@
+enum NotificationSeverity {
+  INFO
+  WARNING
+  CRITICAL
+}
+
+type NotificationFeedPayload {
+  items: [NotificationFeedItem!]!
+}
+
+type NotificationFeedItem {
+  feedKind: String!
+  id: ID!
+  title: String!
+  body: String!
+  severity: NotificationSeverity!
+  source: String
+  readAt: Timestamp
+  createdAt: Timestamp!
+  actionUrl: String
+}
+
+input AdminSendUserNotificationInput {
+  recipientUserId: String!
+  title: String!
+  body: String!
+  kind: String!
+  severity: NotificationSeverity!
+  actionUrl: String
+}
+
+input AdminCreateAnnouncementInput {
+  title: String!
+  body: String!
+  audienceJson: String!
+  expiresAt: Timestamp
+}
+
+extend type Query {
+  myNotifications(limit: Int): NotificationFeedPayload!
+  myUnreadNotificationCount: Int!
+}
+
+extend type Mutation {
+  markNotificationRead(id: ID!): Error
+  markAllNotificationsRead: Error
+  markAnnouncementRead(announcementId: ID!): Error
+  adminSendUserNotification(input: AdminSendUserNotificationInput!): Error
+  adminCreateAnnouncement(input: AdminCreateAnnouncementInput!): Error
+}
