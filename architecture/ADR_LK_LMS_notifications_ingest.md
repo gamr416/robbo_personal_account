@@ -6,7 +6,7 @@ Accepted
 
 ## Context
 
-- ЛК хранит inbox уведомлений в своей PostgreSQL.
+- ЛК хранит inbox в **Projects DB** (`robbo_portal_notifications`), не в `robbo_db` и не в LMS MySQL.
 - Источники: LMS (автоматика) и админы ЛК (GraphQL).
 - OIDC SSO ([ADR_LK_LMS_SSO_OIDC.md](ADR_LK_LMS_SSO_OIDC.md)) не используется для доставки текста уведомлений — нужен отдельный сервер-сервер вызов.
 

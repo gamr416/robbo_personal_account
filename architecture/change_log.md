@@ -1,5 +1,9 @@
 # Журнал изменений архитектуры
 
+## 2026-05-20
+
+- **ЛК ↔ Open edX (2 БД):** Projects PostgreSQL — `scratch_*` + `robbo_portal_*` (`robbo_projects_db/init/03_portal_schema.sql`); LMS MySQL — read-only через `LMS_MYSQL_DSN` / пакет `lmsdb`; без DDL в `openedx`. Backend: OIDC `/auth/oidc/start`, `/auth/oidc/callback`, BFF cookie `lk_bff_session`, `AUTH_MODE=legacy_jwt|oidc_bff`, ingest `POST /internal/lms/notifications` → `robbo_portal_notifications`, outbox worker. Документы: [LMS_HANDOFF.md](LMS_HANDOFF.md), [ADR_LK_TWO_DATABASES.md](ADR_LK_TWO_DATABASES.md), [LEGACY_POSTGRES_CUTOVER.md](LEGACY_POSTGRES_CUTOVER.md). Mock OIDC: `robbo_personal_account_backend/docker-compose.oidc.dev.yml`. Проекты: fallback на `robbo_db` в gateway отключён.
+
 ## 2026-05-09
 
 - **Мои проекты → PROJECT DB (hard switch):** `robbo_personal_account_backend` читает и обновляет проекты через отдельный DSN (`projectsPostgres` / env `PROJECTS_POSTGRES_DSN`), таблица `scratch_projects` в Postgres из [`robbo_projects_db/`](../robbo_projects_db/) включает `title`, `instruction`, `note`, `is_public`, `scratch_vm_json` и маппинг `scratch_project_legacy_map`. Файлы: `package/projects/gateway/projects.go`, `package/projectPage/gateway/projectPage.go`, `package/models/scratchProject*.go`, `package/config/config.yml`. На уже поднятый том добавлен скрипт `init/02_upgrade_pre_meta_projects.sql`; однократный перенос из ЛК БД — `scripts/backfill_lk_projects.py`. Обновлена документация [`архитектура_3_сервисов.md`](архитектура_3_сервисов.md), [`ARCHITECTURE_DETAILED_RU.md`](ARCHITECTURE_DETAILED_RU.md), [`ARCHITECTURE.md`](ARCHITECTURE.md).

@@ -6,7 +6,10 @@
 - **Схема:** `init/01_schema.sql` — `scratch_projects` (метаданные + `scratch_vm_json` для виртуальной машины Scratch в REST `/project/` + поля версий), `scratch_project_versions`, `scratch_project_audit_events`, `scratch_project_legacy_map`; `init/02_upgrade_pre_meta_projects.sql` — безопасно применять к уже существующим томам (расширение колонок, индекс `owner_user_id, updated_at`, приведение `created_by_user_id` версий к `TEXT`):  
   `docker exec <projects_container> psql -U robbo_projects -d robbo_projects -v ON_ERROR_STOP=1 -f /docker-entrypoint-initdb.d/02_upgrade_pre_meta_projects.sql`
 - **Backfill из прежней ЛК БД** (`project_dbs` / `project_page_dbs`): `python3 robbo_projects_db/scripts/backfill_lk_projects.py` (по умолчанию контейнеры `rpa2-postgres-1` и `robbo_projects_postgres`).
-- **Backend ЛК (`robbo_personal_account_backend`):** в `package/config/config.yml` — `projectsPostgres.postgresDsn`; переопределение через **`PROJECTS_POSTGRES_DSN`**. Основная ЛК БД остаётся для пользователей, курсов, уведомлений и др.
+- **Backend ЛК (`robbo_personal_account_backend`):** в `package/config/config.yml` — `projectsPostgres.postgresDsn`; переопределение через **`PROJECTS_POSTGRES_DSN`**. Fallback на `robbo_db` для проектов **отключён**.
+- **Portal-схема:** `init/03_portal_schema.sql` — `robbo_portal_user_link`, `robbo_portal_integration_outbox`, `robbo_portal_notifications`, … (также AutoMigrate в backend).
+- **Миграция пользователей:** `scripts/export_robbo_db_users.py`, `scripts/link_users_from_lms_mysql.py`, `scripts/backfill_owner_from_portal_link.py`.
+- **Legacy `robbo_db`:** см. [architecture/LEGACY_POSTGRES_CUTOVER.md](../architecture/LEGACY_POSTGRES_CUTOVER.md).
 
 ## Обновление по хранению Scratch-проектов
 
