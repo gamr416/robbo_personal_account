@@ -24,6 +24,7 @@
 
 - [ ] `LMS_MYSQL_DSN` или отдельно: host, port, database=`openedx`, user, password
 - [ ] Роль **SELECT** на таблицы: `auth_user`, `auth_userprofile`, `student_courseenrollment`, `course_overviews_courseoverview`, …
+- [ ] Для ЛК runtime (регистрация/профиль): **INSERT/UPDATE** на `auth_user` (email) и `auth_userprofile` (`name`) через `LMS_MYSQL_WRITE_DSN`
 - [ ] VPN / allowlist с хостов ЛК и worker
 - [ ] Staging LMS URL для smoke SSO
 

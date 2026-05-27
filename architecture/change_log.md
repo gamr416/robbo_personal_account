@@ -1,5 +1,9 @@
 # Журнал изменений архитектуры
 
+## 2026-05-27
+
+- **Профиль и регистрация через `auth_userprofile.name`:** полное имя (GraphQL `fullName`) читается/пишется в `auth_userprofile.name`; пароль и email остаются в `auth_user`. LMS-регистрация (`signUpLMS`) создаёт обе строки. UI: одно поле «Полное имя» в профиле и регистрации. Backfill: `scripts/backfill_auth_userprofile_name/`.
+
 ## 2026-05-22
 
 - **Две БД (финальный cutover):** Projects Postgres — только `scratch_projects`, `scratch_project_versions`, `scratch_project_audit_events`; LMS MySQL — `auth_user` (вход, профиль). Сняты `robbo_portal_*`, `scratch_project_legacy_map`, backfill проектов. Backend: `PostgresClient` off при `legacyPostgres.enabled=false`, portal noop, профиль через `lmsdb`. См. [LEGACY_POSTGRES_CUTOVER.md](LEGACY_POSTGRES_CUTOVER.md).

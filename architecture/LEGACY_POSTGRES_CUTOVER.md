@@ -5,7 +5,7 @@
 | Хранилище | DSN | Содержимое |
 |-----------|-----|------------|
 | **Projects Postgres** (`:5433`) | `PROJECTS_POSTGRES_DSN` | Только 3 таблицы: `scratch_projects`, `scratch_project_versions`, `scratch_project_audit_events` |
-| **LMS MySQL** (`:3307`) | `LMS_MYSQL_DSN` (read), `LMS_MYSQL_WRITE_DSN` (profile) | `openedx.auth_user` — вход, профиль, роли (`is_staff` / `is_superuser`) |
+| **LMS MySQL** (`:3307`) | `LMS_MYSQL_DSN` (read), `LMS_MYSQL_WRITE_DSN` (profile) | `auth_user` — вход (пароль, email, username); `auth_userprofile.name` — полное имя (FIO) |
 
 **Не используется:**
 - Legacy `robbo_db` (Postgres `:5432`) — не поднимаем.
@@ -17,7 +17,8 @@
 
 - `legacyPostgres.enabled: false` — `PostgresClient` не подключается к БД; portal gateway = noop.
 - `auth.mode: oidc_bff` + `auth.lmsPasswordFallback: true` — OAuth и/или email+пароль по LMS.
-- Профиль Get/Update — `lmsdb` → `auth_user` (`first_name`, `last_name`, `email`; `username` read-only).
+- Профиль Get/Update — `lmsdb` JOIN `auth_user` + `auth_userprofile`: `email` и `username` из `auth_user`, **полное имя** в `auth_userprofile.name` (GraphQL `fullName`). `first_name`/`last_name` не используются.
+- Регистрация (LMS mode) — INSERT в `auth_user` + `auth_userprofile` через `signUpLMS`.
 - JWT `Id` = `edx_user_id` из LMS.
 
 ## Очистка существующего тома Projects DB
