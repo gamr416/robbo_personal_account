@@ -58,20 +58,6 @@ CREATE INDEX idx_scratch_project_versions_project_created
   ON scratch_project_versions (project_id, created_at DESC);
 
 -- ---------------------------------------------------------------------------
--- Legacy LK IDs mapping for hard switch compatibility
--- ---------------------------------------------------------------------------
-CREATE TABLE scratch_project_legacy_map (
-  id BIGSERIAL PRIMARY KEY,
-  legacy_project_id TEXT UNIQUE,
-  legacy_project_page_id TEXT UNIQUE,
-  storage_project_id UUID NOT NULL REFERENCES scratch_projects (id) ON DELETE CASCADE,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-
-CREATE INDEX idx_scratch_project_legacy_storage
-  ON scratch_project_legacy_map (storage_project_id);
-
--- ---------------------------------------------------------------------------
 -- Audit: opens, new versions, head promotion (optional but recommended in NFR)
 -- ---------------------------------------------------------------------------
 CREATE TABLE scratch_project_audit_events (
@@ -106,5 +92,4 @@ CREATE TRIGGER trg_scratch_projects_updated_at
 
 COMMENT ON TABLE scratch_projects IS 'Scratch storage project (projectRef) plus LK project metadata (title, instruction, note, access)';
 COMMENT ON TABLE scratch_project_versions IS 'Immutable .sb3 snapshots; UNIQUE(project_id, checksum_sha256) for idempotent saves';
-COMMENT ON TABLE scratch_project_legacy_map IS 'Maps legacy LK IDs to storage_project_id for hard-switch compatibility';
 COMMENT ON TABLE scratch_project_audit_events IS 'Audit trail for editor/storage (open, save, head promoted)';

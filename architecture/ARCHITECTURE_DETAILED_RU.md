@@ -213,16 +213,15 @@
 - В workspace каталог **`robbo_projects_db/`** — отдельный PostgreSQL под хранение Scratch-проектов и карточек «Мои проекты» для ЛК (**hard switch**: backend больше не хранит ученический проект в `project_dbs` / `project_page_dbs` для этого контура API).
 - **Запуск:** из `robbo_projects_db/` — `docker compose up -d`; `.env.example` при необходимости. Скрипты `init/*.sql` на **новом** томе выполняются при первой инициализации автоматически.
 - **Порты:** хост **`5433`** по умолчанию (`ROBBO_PROJECTS_DB_PORT`), чтобы не конфликтовать с ЛК Postgres на **`5432`**.
-- **Схема:** `init/01_schema.sql` — `scratch_projects` (метаданные + `scratch_vm_json` для виртуальной машины Scratch в REST `/project/` + поля версий), `scratch_project_versions`, `scratch_project_audit_events`, `scratch_project_legacy_map`; `init/02_upgrade_pre_meta_projects.sql` — безопасно применять к уже существующим томам (расширение колонок, индекс `owner_user_id, updated_at`, приведение `created_by_user_id` версий к `TEXT`):  
-  `docker exec <projects_container> psql -U robbo_projects -d robbo_projects -v ON_ERROR_STOP=1 -f /docker-entrypoint-initdb.d/02_upgrade_pre_meta_projects.sql`
-- **Backfill из прежней ЛК БД** (`project_dbs` / `project_page_dbs`): `python3 robbo_projects_db/scripts/backfill_lk_projects.py` (по умолчанию контейнеры `rpa2-postgres-1` и `robbo_projects_postgres`).
-- **Backend ЛК (`robbo_personal_account_backend`):** в `package/config/config.yml` — `projectsPostgres.postgresDsn`; переопределение через **`PROJECTS_POSTGRES_DSN`**. Основная ЛК БД остаётся для пользователей, курсов, уведомлений и др.
+- **Схема:** `init/01_schema.sql` — **3 таблицы:** `scratch_projects`, `scratch_project_versions`, `scratch_project_audit_events`; `init/02_upgrade_pre_meta_projects.sql` — идемпотентно для существующих томов (в т.ч. `DROP scratch_project_legacy_map`).
+- **Очистка старого тома:** `scripts/cleanup_projects_db.sql` (portal, `*_dbs`, legacy map).
+- **Backend ЛК:** `PROJECTS_POSTGRES_DSN` — только Scratch; профиль/вход — `LMS_MYSQL_DSN` / `LMS_MYSQL_WRITE_DSN` → `auth_user`.
 
 ## Обновление по хранению Scratch-проектов
 
 - В упрощенной целевой схеме `Projects Storage Service` становится частью `scratchEditor` (отдельный сервис не выделяется).
 - Карточка «Мои проекты», JSON для REST `/project/`, версии `.sb3` хранятся в **PROJECT DB** (`scratch_projects`, `scratch_project_versions`, см. **`robbo_projects_db/`**).
-- Связь наставник–ученик и прочая непроектная метадата ЛК остаются в контуре **ЛК Postgres** или **IdentityDB** по дорожной карте доменов — отдельно от STORAGE ученических `.sb3`.
+- Связь наставник–ученик и курсы в UI — вне Projects DB (LMS API / отдельный этап); пользователи и профиль — **LMS MySQL**.
 - Открытие проекта остается только через `scratch.ru`:
   - ЛК проверяет доступ и делает редирект `scratch.ru/editor?projectRef={storage_project_id}`,
   - `scratch.ru` загружает/сохраняет проект в PostgreSQL (`BYTEA`) через свой встроенный storage API.
@@ -266,7 +265,7 @@
   - `src/helpers/lmsSso.js` — генерация `state`, `nonce`, `code_verifier`, `code_challenge` и сборка authorize URL.
 - До заполнения OIDC-параметров (`LMS_OAUTH_AUTHORIZE_URL`, `LMS_OAUTH_CLIENT_ID`, `LMS_OAUTH_REDIRECT_URI`) используется безопасный fallback: прямое открытие LMS URL в новой вкладке.
 - На странице регистрации при ответе backend о дублирующемся email (`email is already used`/`user already exist`) показывается UI-уведомление: «Пользователь с таким email уже зарегистрирован» (`src/sagas/login.js`).
-- **Мои проекты (ученик):** список и карточка читаются/пишутся в **PROJECT DB** (`scratch_projects`); те же контракты API (`PUT /projectPage/`, GraphQL `GetProjectPageById`). Идентификатор строки после миграции — UUID (равен `projectId`/`storage_project_id`); для старых закладок с числовым id поддерживается `scratch_project_legacy_map`. Последнее изменение — поле `updated_at` строки проекта.
+- **Мои проекты (ученик):** список и карточка в **PROJECT DB** (`scratch_projects`); идентификатор — UUID. Legacy числовые id не резолвятся.
 
 ### Inbox уведомлений (апрель 2026)
 

@@ -1,5 +1,9 @@
 # Журнал изменений архитектуры
 
+## 2026-05-22
+
+- **Две БД (финальный cutover):** Projects Postgres — только `scratch_projects`, `scratch_project_versions`, `scratch_project_audit_events`; LMS MySQL — `auth_user` (вход, профиль). Сняты `robbo_portal_*`, `scratch_project_legacy_map`, backfill проектов. Backend: `PostgresClient` off при `legacyPostgres.enabled=false`, portal noop, профиль через `lmsdb`. См. [LEGACY_POSTGRES_CUTOVER.md](LEGACY_POSTGRES_CUTOVER.md).
+
 ## 2026-05-20
 
 - **ЛК ↔ Open edX (2 БД):** Projects PostgreSQL — `scratch_*` + `robbo_portal_*` (`robbo_projects_db/init/03_portal_schema.sql`); LMS MySQL — read-only через `LMS_MYSQL_DSN` / пакет `lmsdb`; без DDL в `openedx`. Backend: OIDC `/auth/oidc/start`, `/auth/oidc/callback`, BFF cookie `lk_bff_session`, `AUTH_MODE=legacy_jwt|oidc_bff`, ingest `POST /internal/lms/notifications` → `robbo_portal_notifications`, outbox worker. Документы: [LMS_HANDOFF.md](LMS_HANDOFF.md), [ADR_LK_TWO_DATABASES.md](ADR_LK_TWO_DATABASES.md), [LEGACY_POSTGRES_CUTOVER.md](LEGACY_POSTGRES_CUTOVER.md). Mock OIDC: `robbo_personal_account_backend/docker-compose.oidc.dev.yml`. Проекты: fallback на `robbo_db` в gateway отключён.

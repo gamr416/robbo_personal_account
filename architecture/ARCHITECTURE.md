@@ -62,5 +62,5 @@ flowchart LR
 
 Монорепо-обёртка с субмодулями: [github.com/gamr416/robbo_personal_account](https://github.com/gamr416/robbo_personal_account) — в `README` ссылки на `tree/main` frontend/backend.
 
-**БД Scratch-проектов (метаданные карточки + storage `.sb3`):** каталог [`robbo_projects_db/`](../robbo_projects_db/) — `docker-compose.yml` (`5433` на хосте), `init/01_schema.sql` и идемпотентная миграция `init/02_upgrade_pre_meta_projects.sql` для уже существующих томов; таблицы `scratch_projects` (поля включая `title`, `instruction`, `note`, `is_public`, `scratch_vm_json` для совместимости REST `/project/`), версии `.sb3` в `scratch_project_versions`, маппинг старых id ЛК в `scratch_project_legacy_map`; backfill однократно: `scripts/backfill_lk_projects.py`. Backend: второй DSN — `projectsPostgres.postgresDsn` в `package/config/config.yml`, env `PROJECTS_POSTGRES_DSN`.
+**БД Scratch-проектов:** каталог [`robbo_projects_db/`](../robbo_projects_db/) — Postgres `:5433`, **3 таблицы** `scratch_*`; DSN `PROJECTS_POSTGRES_DSN`. **Пользователи** — LMS MySQL `LMS_MYSQL_DSN` / `LMS_MYSQL_WRITE_DSN`. См. [LEGACY_POSTGRES_CUTOVER.md](LEGACY_POSTGRES_CUTOVER.md).
 

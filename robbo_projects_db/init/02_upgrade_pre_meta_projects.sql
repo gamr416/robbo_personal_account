@@ -15,16 +15,7 @@ CREATE INDEX IF NOT EXISTS idx_scratch_projects_owner_updated
   ON scratch_projects (owner_user_id, updated_at DESC)
   WHERE deleted_at IS NULL;
 
-CREATE TABLE IF NOT EXISTS scratch_project_legacy_map (
-  id BIGSERIAL PRIMARY KEY,
-  legacy_project_id TEXT UNIQUE,
-  legacy_project_page_id TEXT UNIQUE,
-  storage_project_id UUID NOT NULL REFERENCES scratch_projects (id) ON DELETE CASCADE,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-
-CREATE INDEX IF NOT EXISTS idx_scratch_project_legacy_storage
-  ON scratch_project_legacy_map (storage_project_id);
+DROP TABLE IF EXISTS scratch_project_legacy_map;
 
 -- Normalize author ids on versions (historically UUID).
 ALTER TABLE scratch_project_versions
