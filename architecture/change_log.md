@@ -1,5 +1,10 @@
 # Журнал изменений архитектуры
 
+## 2026-05-27 (инвентаризация)
+
+- Добавлен **[FUNCTIONALITY_RU.md](FUNCTIONALITY_RU.md)** — полный перечень маршрутов фронта, HTTP/GraphQL backend, хранилищ, интеграций и технического долга (inbox REST не смонтирован; админка юнитов требует legacy Postgres).
+- Обновлены **[ARCHITECTURE_DETAILED_RU.md](ARCHITECTURE_DETAILED_RU.md)** (i18n, Help, OIDC BFF, CoursePage, актуальный статус уведомлений), **[ARCHITECTURE.md](ARCHITECTURE.md)** (ссылка на инвентарь), **[ADR_LK_TWO_DATABASES.md](ADR_LK_TWO_DATABASES.md)**, **[ADR_LK_LMS_notifications_ingest.md](ADR_LK_LMS_notifications_ingest.md)**.
+
 ## 2026-05-27
 
 - **Профиль и регистрация через `auth_userprofile.name`:** полное имя (GraphQL `fullName`) читается/пишется в `auth_userprofile.name`; пароль и email остаются в `auth_user`. LMS-регистрация (`signUpLMS`) создаёт обе строки. UI: одно поле «Полное имя» в профиле и регистрации. Backfill: `scripts/backfill_auth_userprofile_name/`.

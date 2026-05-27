@@ -60,6 +60,8 @@ flowchart LR
 
 ЛК: на `/home` у админов юнита и суперадмина в сайдбаре — кнопка «Отправить уведомление» над меню (см. `ARCHITECTURE_DETAILED_RU.md`, inbox уведомлений).
 
+**Инвентарь функционала (маршруты, API, cutover, долг):** [FUNCTIONALITY_RU.md](FUNCTIONALITY_RU.md).
+
 Монорепо-обёртка с субмодулями: [github.com/gamr416/robbo_personal_account](https://github.com/gamr416/robbo_personal_account) — в `README` ссылки на `tree/main` frontend/backend.
 
 **БД Scratch-проектов:** каталог [`robbo_projects_db/`](../robbo_projects_db/) — Postgres `:5433`, **3 таблицы** `scratch_*`; DSN `PROJECTS_POSTGRES_DSN`. **Пользователи** — LMS MySQL `LMS_MYSQL_DSN` / `LMS_MYSQL_WRITE_DSN`. См. [LEGACY_POSTGRES_CUTOVER.md](LEGACY_POSTGRES_CUTOVER.md).

@@ -2,6 +2,8 @@
 
 Проект состоит из двух основных приложений — **frontend** (`robbo_personal_account_frontend`) и **backend** (`robbo_personal_account_backend`), а также **PostgreSQL** как основной СУБД. Сервисы локально и в docker-compose взаимодействуют по HTTP. Авторизация реализована по **JWT**, клиент общается с сервером через **GraphQL**-API.
 
+**Полный перечень маршрутов, API и расхождений с cutover:** [FUNCTIONALITY_RU.md](FUNCTIONALITY_RU.md). Матрица прав: `user_roles_capabilities.csv` в корне workspace.
+
 Существует **монорепо-обёртка** [`gamr416/robbo_personal_account`](https://github.com/gamr416/robbo_personal_account): в ней `frontend/` и `backend/` — git-субмодули на указанные коммиты; на GitHub в корне видны именно эти SHA. Актуальная ветка `main` кода — по прямым ссылкам на репозитории субмодулей (см. `README` монорепо и `change_log.md`).
 
 - **Frontend**: одностраничное приложение на React с использованием `react-router-dom`, `redux`/`redux-saga`, Ant Design, `styled-components`. Собирается через Webpack, отдается Node/Express-сервером на порту `3030`.
@@ -37,6 +39,13 @@
   - Состояние сворачивания бокового меню (`collapsed`) в `PageLayout` сохраняется в `localStorage` (`lk_sidebar_collapsed`), поэтому после переходов между разделами меню не разворачивается автоматически.
   - `Landing` использует статические медиа из `materials/` (в рантайме доступны как `/materials/*`) и проигрывает видео в цикле как “гифки”; для блока 1.2 реализован эффект “кадр в кадре”.
   - Страница `Register` отправляет данные формы в `signUpRequest({ user, role })`; saga вызывает `auth/sign-up`, после успешного ответа редиректит пользователя на защищенную зону (`/home`).
+  - **i18n:** переключатель языка в шапке — `ru`, `en`, `zh` (`react-intl`, Redux `changeLanguage`).
+  - **Глобальная кнопка «Помощь»** на всех маршрутах → `https://support.robbo.world/` (новая вкладка).
+  - **OIDC callback** `/auth/oidc/callback` на фронте: обмен code (PKCE), сохранение LMS identity link, редирект `/home`.
+  - **Login:** проверка `GET /auth/oidc/status`; кнопка «Войти через LMS» → `/auth/oidc/start`; гибрид с email/паролем при `lms_password_fallback`.
+  - **Профиль:** одно поле «Полное имя» (`fullName` ↔ `auth_userprofile.name`); доп. поля LMS (страна, год рождения, пол, язык, уровень образования) — см. `lmsProfileOptions`.
+  - **Курсы в ЛК:** маршрут `/courses/:coursePageId` — карточка курса, ссылка на `edx-test.ru`, модал **CourseAccess** (выдача доступа student/teacher/unit/group); списка «Мои курсы» в ЛК нет — `/mycourses` редиректит в LMS.
+  - **Админ-разделы:** `/clients` (родители, super admin), `/teachers`, `/unitAdmins`, `/robboUnits`, `/robboGroups` — данные через GraphQL (требуют legacy Postgres, см. [FUNCTIONALITY_RU.md](FUNCTIONALITY_RU.md)).
   - Страница `ProjectPage` (`/projects/:projectPageId`) при сохранении диспатчит `updateProjectPage(token, payload)`; после успешного обновления фронт делает refetch `GetProjectPageById`, чтобы UI сразу отобразил сохраненные данные.
   - На backend доступ к `ProjectPage` защищен проверкой владельца: для чтения/обновления `ProjectPage` проверяется, что связанный `Project` принадлежит текущему `user_id` (owner-check). При отсутствии доступа возвращается ошибка `403` (GraphQL) / `403` (REST).
 - **Пример страницы Robbo Units**:
@@ -91,9 +100,10 @@
 - **Gin HTTP сервер**:
   - Поднимает HTTP-сервер на порту `8080`.
   - Регистрирует:
-    - endpoint GraphQL (`POST /graphql`, часто также `GET /graphql` для Playground),
-    - технические endpoints (например, `/healthz`, `/metrics` при наличии),
-    - middleware для логирования, CORS, восстановления после паники.
+    - GraphQL Playground `GET /`, executor `POST /query`,
+    - REST `/auth/*`, `/auth/oidc/*` (BFF SSO), `/internal/lms/notifications`, `/project*`, `/course/*`,
+    - middleware: CORS, `TokenAuthMiddleware` (режимы `legacy_jwt` | `oidc_bff` | `lms_db`),
+    - часть REST (`/users`, `/robboUnits`, …) **закомментирована** — сценарии перенесены в GraphQL.
 - **GraphQL через `gqlgen`**:
   - Схема (`schema.graphql` или аналогичный файл) описывает типы, запросы и мутации:
     - сущности (пользователь, RobboUnit и т.п.),
@@ -267,16 +277,23 @@
 - На странице регистрации при ответе backend о дублирующемся email (`email is already used`/`user already exist`) показывается UI-уведомление: «Пользователь с таким email уже зарегистрирован» (`src/sagas/login.js`).
 - **Мои проекты (ученик):** список и карточка в **PROJECT DB** (`scratch_projects`); идентификатор — UUID. Legacy числовые id не резолвятся.
 
-### Inbox уведомлений (апрель 2026)
+### Inbox уведомлений (апрель 2026, статус май 2026)
 
-- **Источники:** LMS (HTTP ingest) и админы ЛК (HTTP JSON API с JWT). Контракт LMS → ЛК описан в [ADR_LK_LMS_notifications_ingest.md](ADR_LK_LMS_notifications_ingest.md).
-- **Backend (`robbo_personal_account/backend`):**
-  - Таблицы PostgreSQL: `user_notifications` (персональные, поле `source`: `lms` \| `admin`), `system_announcements` (broadcast одной строкой), `announcement_reads` (прочтение объявлений без fan-out по всем пользователям).
-  - `POST /internal/lms/notifications` — приём от LMS, Bearer-токен из конфига `lmsNotifications.ingestBearerToken`, флаг `lmsNotifications.enabled`; маршрут пропускается без JWT middleware.
-  - `GET/POST /api/notifications/*` — лента, счётчик непрочитанных, отметка прочитанного, админские `POST .../admin/personal` и `.../admin/announcement` (broadcast только `SuperAdmin`).
-  - Логика в пакете `package/notifications`, HTTP-обработчики в `package/notifications/http`.
-- **Frontend (`robbo_personal_account_frontend`):**
-  - Колокольчик в шапке `PageLayout`: в одной правой flex-группе с переключателем языка (`margin-left: auto` у контейнера), порядок — язык, затем колокольчик у правого края.
-  - Пункт меню «Отправить уведомление» и страница `/send-notification` для ролей super admin и unit admin (broadcast — только super admin).
-  - На маршруте `/home` для **unit admin** и **super admin** над `Ant Menu` в `SideBar` показывается блок с кнопкой «Отправить уведомление» (`Button` на всю ширину сайдбара): переход на `/send-notification` с `location.state.selectedNavBarKey: 'send_notification'`, чтобы подсветка пункта меню совпадала с переходом из меню.
+- **Контракт LMS → ЛК:** [ADR_LK_LMS_notifications_ingest.md](ADR_LK_LMS_notifications_ingest.md).
+- **Backend (факт):**
+  - Реализован только **`POST /internal/lms/notifications`** (`package/portal/http/notifications.go`) → таблица **`robbo_portal_notifications`** в **legacy Postgres** через `package/portal/gateway`.
+  - Работает при **`legacyPostgres.enabled=true`** и **`lmsNotifications.enabled=true`**; при cutover (`legacyPostgres.enabled=false`) portal gateway = **noop**, ingest возвращает ошибку хранения.
+  - Публичный REST **`/api/notifications/*`** (лента, mark-read, admin send) на backend **не смонтирован**; черновик схемы — `notifications_graphql_sketch.graphqls`.
+- **Frontend (факт):**
+  - UI готов: колокольчик в `PageLayout`, страница `/send-notification`, клиент `src/api/notifications.js` ожидает `/api/notifications/*` — до реализации backend запросы завершатся ошибкой.
+  - Колокольчик и язык — одна flex-группа справа; на `/home` у unit admin и super admin — кнопка «Отправить уведомление» над меню.
+- **Целевое состояние после cutover:** либо вернуть `robbo_portal_notifications` в отдельное хранилище, либо реализовать `/api/notifications` без legacy Postgres — см. [FUNCTIONALITY_RU.md](FUNCTIONALITY_RU.md).
+
+### OIDC BFF и режимы auth (май 2026)
+
+- **`/auth/oidc/start`** — Authorization Code + PKCE (`prompt=none` по умолчанию; `?prompt=login` для формы IdP).
+- **`/auth/oidc/callback`**, **`/auth/oidc/logout`**, **`/auth/oidc/status`** — сессия BFF (cookie), поля `authenticated`, `edx_user_id`, `role`.
+- **`auth.mode`:** `legacy_jwt` | `oidc_bff` | `lms_db`; в compose по умолчанию `oidc_bff` + `lmsPasswordFallback`.
+- **LMS password login:** `signInLMS` — роль из `auth_user.is_superuser` / `is_staff` (иначе Student); JWT `Id` = `edx_user_id`.
+- **Регистрация без legacy:** `signUpLMS` → INSERT в `auth_user` + `auth_userprofile`.
 
