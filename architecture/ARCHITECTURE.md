@@ -49,7 +49,7 @@ flowchart TB
 ```mermaid
 flowchart LR
   user[UserBrowser] --> lk[LKFrontend]
-  lk -->|new tab| lmsUrl[LMS_URL_lms2_robbo_world]
+  lk -->|new tab| lmsUrl[LMS_URL_online_robbo_ru]
   lk -->|if OIDC configured authorize code PKCE| idp[IdentityAuth_OIDC]
   idp -->|auth_code| lmsCb[LMS_Callback]
   lmsCb -->|token exchange| idp

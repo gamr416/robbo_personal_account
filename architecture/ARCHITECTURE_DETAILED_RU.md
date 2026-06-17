@@ -267,7 +267,7 @@
 ### Текущая реализация в ЛК (апрель 2026)
 
 - В боковом меню ЛК раздел `Мои курсы` заменен на `LMS` для ролей student/parent/unit admin/super admin/free listener.
-- Пункт `LMS` открывает новую вкладку и ведет на `https://lms2.robbo.world`.
+- Пункт `LMS` открывает новую вкладку и ведет на `https://online.robbo.ru`.
 - На странице `Home` быстрые действия также используют карточку `LMS` вместо `Мои курсы`.
 - Маршрут `/mycourses` не показывает старый раздел «Мои курсы»: сразу выполняется редирект в LMS в текущей вкладке (`src/pages/LmsRedirect`, `navigateToLmsSameTab` из `src/helpers/lmsSso.js`).
 - В frontend добавлен задел под OIDC Authorization Code + PKCE:
