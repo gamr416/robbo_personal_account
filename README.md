@@ -4,7 +4,9 @@ Monorepo-wrapper with submodules:
 
 - `frontend/` (git submodule) → [robbo_personal_account_frontend](https://github.com/gamr416/robbo_personal_account_frontend)
 - `backend/` (git submodule) → [robbo_personal_account_backend](https://github.com/gamr416/robbo_personal_account_backend)
+- `robboscratch3_gui/` (git submodule) → [robboscratch3_gui](https://github.com/gamr416/robboscratch3_gui) (embed Scratch player, ветка `master`)
 - `architecture/` (tracked files in this repo)
+- `robbo_projects_db/` (tracked files in this repo)
 
 ## Актуальная «основная» версия кода (ветка `main`)
 
@@ -16,19 +18,30 @@ Monorepo-wrapper with submodules:
 |-----------|-------------------------|
 | Frontend | [github.com/gamr416/robbo_personal_account_frontend/tree/main](https://github.com/gamr416/robbo_personal_account_frontend/tree/main) |
 | Backend | [github.com/gamr416/robbo_personal_account_backend/tree/main](https://github.com/gamr416/robbo_personal_account_backend/tree/main) |
+| Scratch GUI | [github.com/gamr416/robboscratch3_gui/tree/master](https://github.com/gamr416/robboscratch3_gui/tree/master) |
 
 Апстрим-организация (при наличии доступа): [robboworld/robbo_personal_account_frontend](https://github.com/robboworld/robbo_personal_account_frontend), [robboworld/robbo_personal_account_backend](https://github.com/robboworld/robbo_personal_account_backend).
 
 Обновить закреплённые коммиты субмодулей в этом монорепо после релиза в дочерних репо:
 
 ```bash
-git submodule update --remote --merge frontend backend
-git add frontend backend
-git commit -m "chore: bump frontend/backend submodules"
+git submodule update --remote --merge frontend backend robboscratch3_gui
+git add frontend backend robboscratch3_gui
+git commit -m "chore: bump frontend/backend/robboscratch3_gui submodules"
 git push
 ```
 
 (`branch = main` задан в `.gitmodules`, чтобы `--remote` тянул именно `main`.)
+
+## Локальный запуск
+
+```bash
+git clone --recurse-submodules https://github.com/gamr416/robbo_personal_account.git
+cd robbo_personal_account
+./setup.sh
+```
+
+Поднимает Projects Postgres, LMS MySQL, mock OIDC, backend, frontend и Scratch player (`:5001`).
 
 ## Clone
 

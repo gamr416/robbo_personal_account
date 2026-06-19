@@ -1,5 +1,10 @@
 # Журнал изменений архитектуры
 
+## 2026-06-19
+
+- **Scratch embed-плеер в ЛК:** `robboscratch3_gui` — режим `player.html` с `EmbedProjectLoaderHOC`, Docker-образ Nginx (`:5001`). Frontend: компонент `ScratchPlayerEmbed`, play-токен через backend. Субмодуль `robboscratch3_gui/` в монорепо; `setup.sh` собирает `scratch-gui` перед `web`.
+- **Публичная галерея проектов:** маршрут `/projects/public`, API `GET /projectPage/public`, управление доступом (`access/`), JWT play-токен (`playtoken/`), навигация `HeaderExploreNav`.
+
 ## 2026-05-27 (инвентаризация)
 
 - Добавлен **[FUNCTIONALITY_RU.md](FUNCTIONALITY_RU.md)** — полный перечень маршрутов фронта, HTTP/GraphQL backend, хранилищ, интеграций и технического долга (inbox REST не смонтирован; админка юнитов требует legacy Postgres).

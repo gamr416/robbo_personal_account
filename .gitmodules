@@ -6,3 +6,7 @@
 	path = backend
 	url = https://github.com/gamr416/robbo_personal_account_backend.git
 	branch = main
+[submodule "robboscratch3_gui"]
+	path = robboscratch3_gui
+	url = https://github.com/gamr416/robboscratch3_gui.git
+	branch = master
