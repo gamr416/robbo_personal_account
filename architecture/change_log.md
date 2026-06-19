@@ -2,8 +2,10 @@
 
 ## 2026-06-19
 
+- **Где править код ЛК:** зафиксировано в `.cursor/rules/Architecture.mdc` и `ARCHITECTURE_DETAILED_RU.md` — разработка только в `robbo_personal_account_frontend/` и `robbo_personal_account_backend/`; `robbo_personal_account/` — монорепо с субмодулями, исходный код там не менять.
 - **Scratch embed-плеер в ЛК:** `robboscratch3_gui` — режим `player.html` с `EmbedProjectLoaderHOC`, Docker-образ Nginx (`:5001`). Frontend: компонент `ScratchPlayerEmbed`, play-токен через backend. Субмодуль `robboscratch3_gui/` в монорепо; `setup.sh` собирает `scratch-gui` перед `web`.
 - **Публичная галерея проектов:** маршрут `/projects/public`, API `GET /projectPage/public`, управление доступом (`access/`), JWT play-токен (`playtoken/`), навигация `HeaderExploreNav`.
+- **Сверка документации с кодом:** обновлены `.cursor/rules/Architecture.mdc`, `ARCHITECTURE.md` (диаграммы без legacy postgres в compose backend), `FUNCTIONALITY_RU.md`, `ARCHITECTURE_DETAILED_RU.md` — два OIDC-потока, Apollo+REST, `setup.sh` стек, роли ProjectPage/PublicProjects; удалены битые ссылки на `lk+lms.md` и отсутствующие CSV матрицы ролей.
 
 ## 2026-05-27 (инвентаризация)
 

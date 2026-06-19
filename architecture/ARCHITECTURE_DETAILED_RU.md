@@ -2,9 +2,11 @@
 
 Проект состоит из двух основных приложений — **frontend** (`robbo_personal_account_frontend`) и **backend** (`robbo_personal_account_backend`), а также **PostgreSQL** как основной СУБД. Сервисы локально и в docker-compose взаимодействуют по HTTP. Авторизация реализована по **JWT**, клиент общается с сервером через **GraphQL**-API.
 
-**Полный перечень маршрутов, API и расхождений с cutover:** [FUNCTIONALITY_RU.md](FUNCTIONALITY_RU.md). Матрица прав: `user_roles_capabilities.csv` в корне workspace.
+**Полный перечень маршрутов, API и расхождений с cutover:** [FUNCTIONALITY_RU.md](FUNCTIONALITY_RU.md).
 
 Существует **монорепо-обёртка** [`gamr416/robbo_personal_account`](https://github.com/gamr416/robbo_personal_account): в ней `frontend/` и `backend/` — git-субмодули на указанные коммиты; на GitHub в корне видны именно эти SHA. Актуальная ветка `main` кода — по прямым ссылкам на репозитории субмодулей (см. `README` монорепо и `change_log.md`).
+
+**Где вносить изменения:** весь код ЛК правится только в **`robbo_personal_account_frontend/`** и **`robbo_personal_account_backend/`**. Каталог **`robbo_personal_account/`** — репозиторий с субмодулями для полного локального стека (`setup.sh`); **исходный код в нём не менять** — правки в `frontend/` и `backend/` внутри монорепо не синхронизируются с рабочими копиями автоматически.
 
 - **Frontend**: одностраничное приложение на React с использованием `react-router-dom`, `redux`/`redux-saga`, Ant Design, `styled-components`. Собирается через Webpack, отдается Node/Express-сервером на порту `3030`.
 - **Backend**: Go-приложение на базе Gin, GraphQL реализован через `gqlgen`. Работает на порту `8080`, использует `GORM` для доступа к PostgreSQL.
@@ -16,14 +18,14 @@
 
 - **React SPA**: UI построен как одностраничное приложение, маршрутизация внутри происходит через `react-router-dom`.
 - **Состояние и сайд-эффекты**:
-  - `redux` отвечает за глобальное состояние приложения (пользователь, токены, список юнитов, статусы загрузки и т.п.).
-  - `redux-saga` управляет асинхронными операциями (запросы к GraphQL API, обновление токенов, последовательные цепочки эффектов).
+  - `redux` — глобальное состояние (пользователь, токены, проекты, загрузки).
+  - `redux-saga` — асинхронные цепочки (REST projectPage, login, админские списки).
+  - **Apollo Client** — GraphQL (профиль, юниты, группы, курсы, мутации ролей).
 - **UI-библиотека**: Ant Design (компоненты форм, таблиц, модальных окон и т.п.).
 - **Стили**: `styled-components` для модульного и переиспользуемого оформления компонентов.
 - **Сборка**: Webpack-конфигурация (`webpack.common.js` и окружения) формирует bundle, поддерживает алиасы путей, загрузчики для JS/JSX, стилей и ассетов.
 - **Сервер разработки**: Node/Express-сервер на `:3030` (команда `yarn start`), который:
-  - отдает собранный frontend-бандл,
-  - проксирует API-запросы на backend (порт `8080`, путь `/graphql` либо аналогичный).
+  - отдаёт собранный frontend-бандл (dev: webpack-dev-server `:3030`; prod: Express `server.js`).
 
 ### Структура страниц и модулей
 
@@ -41,8 +43,8 @@
   - Страница `Register` отправляет данные формы в `signUpRequest({ user, role })`; saga вызывает `auth/sign-up`, после успешного ответа редиректит пользователя на защищенную зону (`/home`).
   - **i18n:** переключатель языка в шапке — `ru`, `en`, `zh` (`react-intl`, Redux `changeLanguage`).
   - **Глобальная кнопка «Помощь»** на всех маршрутах → `https://support.robbo.world/` (новая вкладка).
-  - **OIDC callback** `/auth/oidc/callback` на фронте: обмен code (PKCE), сохранение LMS identity link, редирект `/home`.
-  - **Login:** проверка `GET /auth/oidc/status`; кнопка «Войти через LMS» → `/auth/oidc/start`; гибрид с email/паролем при `lms_password_fallback`.
+  - **Login:** `GET /auth/oidc/status`; «Войти через LMS» → `/auth/oidc/start`; email/пароль при `lmsPasswordFallback`.
+  - **Публичные проекты:** `/projects/public`, `HeaderExploreNav`; embed — `ScratchPlayerEmbed` + play-token.
   - **Профиль:** одно поле «Полное имя» (`fullName` ↔ `auth_userprofile.name`); доп. поля LMS (страна, год рождения, пол, язык, уровень образования) — см. `lmsProfileOptions`.
   - **Курсы в ЛК:** маршрут `/courses/:coursePageId` — карточка курса, ссылка на `edx-test.ru`, модал **CourseAccess** (выдача доступа student/teacher/unit/group); списка «Мои курсы» в ЛК нет — `/mycourses` редиректит в LMS.
   - **Админ-разделы:** `/clients` (родители, super admin), `/teachers`, `/unitAdmins`, `/robboUnits`, `/robboGroups` — данные через GraphQL (требуют legacy Postgres, см. [FUNCTIONALITY_RU.md](FUNCTIONALITY_RU.md)).
@@ -60,18 +62,13 @@
 
 ### Взаимодействие с backend
 
-- **Тип транспорта**: GraphQL over HTTP.
-- **Точка входа**: как правило, `/graphql` на backend-сервере `:8080`.
-- **Слой API**:
-  - Выделенный модуль(и) для выполнения GraphQL-запросов/мутаций (через `fetch`/`axios` или специализированный GraphQL-клиент).
-  - Все сетевые вызовы оборачиваются в саги:
-    - саги слушают действия вида `FETCH_*_REQUEST`,
-    - выполняют запрос, затем диспатчат `SUCCESS` или `FAILURE`,
-    - при необходимости триггерят показ уведомлений/модальных окон.
+- **Тип транспорта**: GraphQL (`POST /query`) + REST (`/auth`, `/projectPage`, `/course`).
+- **GraphQL**: Apollo Client (`src/index.js`, `graphQL/`).
+- **REST / проекты**: redux-saga + `api/` (axios).
 - **Авторизация на клиенте**:
-  - JWT-токен хранится в `localStorage`/`sessionStorage` или Redux (в зависимости от реализации).
-  - При наличии токена он добавляется в заголовок `Authorization: Bearer <token>` для всех GraphQL-запросов.
-  - При истечении срока действия токена либо вызывается endpoint обновления токена, либо пользователь перенаправляется на страницу логина.
+  - JWT в `localStorage` + заголовок `Authorization: Bearer` (Apollo link, axios).
+  - OIDC BFF: cookie-сессия backend; вкладка LMS — PKCE + `localStorage` identity link.
+  - Refresh: `GET /auth/refresh` (cookie `refresh_token`).
 
 ## Backend: robbo_personal_account_backend
 
@@ -160,28 +157,29 @@
   - Внешние ключи обеспечивают целостность связей между сущностями.
   - Для часто используемых выборок могут быть настроены индексы.
 - **Подключение**:
-  - Backend подключается к БД на `:5432` с использованием параметров из `config.yml`.
-  - В docker-compose БД описана как сервис `postgres`/`PGsvc` с volume для персистентности данных.
+  - Legacy: backend на `:5432` при `legacyPostgres.enabled=true` (`postgres.postgresDsn`).
+  - Projects DB — отдельный compose `robbo_projects_db/` на `:5433`.
+  - LMS MySQL — `docker-compose.lms_mysql.yml` на `:3307`.
 
 ## Docker Compose и локальная разработка
 
-### Сервисы в docker-compose
+### Локальный стек (`robbo_personal_account/setup.sh`)
 
-- **Frontend-сервис**:
-  - Сервис **`web`** собирает frontend из `robbo_personal_account_frontend`; в compose задано `name: robbo_personal_account_frontend` (стабильное имя проекта).
-  - В workspace может существовать вторая копия фронта — `robbo_personal_account/frontend/`; если контейнер на проде поднят из неё, пересборка должна выполняться **в том же каталоге**, иначе изменений не будет.
-  - После `docker compose build web` для применения образа нужен **`docker compose up -d --build web`**, иначе запущенный контейнер остаётся на старом image id.
-  - Публикует порт `3030:3030`.
-  - Может использовать `network_mode: host` для упрощения доступа к backend’у.
-- **Backend-сервис**:
-  - Сервис **`app`** (Go backend) билдится из `robbo_personal_account_backend`; в compose задано `name: rpa2`, образ **`rpa2-app`** (совместимость со стеком `-p rpa2`).
-  - После сборки — **`docker compose up -d --build app`** для пересоздания контейнера.
-  - Публикует порт `8080:8080`.
-  - Имеет зависимость `depends_on: postgres` с `healthcheck` для БД.
-- **Postgres-сервис**:
-  - Официальный образ `postgres:13`.
-  - Порт `5432:5432`.
-  - Volume `postgres_data` для хранения данных.
+| Шаг | Compose-файл | Порт | Сервис |
+|-----|--------------|------|--------|
+| Projects DB | `robbo_projects_db/docker-compose.yml` | 5433 | `postgres` |
+| LMS MySQL | `backend/docker-compose.lms_mysql.yml` | 3307 | `lms_mysql` |
+| Mock OIDC | `backend/docker-compose.oidc.dev.yml` | 8081 | `mock-oauth2` |
+| Backend | `backend/docker-compose.yml` (`name: rpa2`) | 8080 | `app` |
+| Frontend | `frontend/docker-compose.yml` | 3030, 5001 | `web`, `scratch-gui` |
+
+**Важно:** `robbo_personal_account_backend/docker-compose.yml` содержит **только** сервис `app` — без Postgres. Legacy `robbo_db` подключается отдельно при `legacyPostgres.enabled=true`.
+
+### Сервисы по отдельности
+
+- **Frontend `web`**: `name: robbo_personal_account_frontend`, порт `3030`, `network_mode: host`, зависит от `scratch-gui` (:5001).
+- **Backend `app`**: `name: rpa2`, образ `rpa2-app`, порт `8080`. После `build` — `up -d --build app`.
+- **Projects Postgres**: `robbo_projects_db/`, порт `5433`, volume + `init/*.sql`.
 
 ### Поток запросов в runtime
 
@@ -189,7 +187,7 @@
 2. Node/Express-сервер фронтенда отдает React-бандл.
 3. React-приложение загружается, инициализирует Redux-store и саги.
 4. При необходимости загрузить данные (например, список Robbo Units) компонент диспатчит действие `FETCH_ROBBO_UNITS_REQUEST`.
-5. Сага перехватывает действие, формирует GraphQL запрос и отправляет его на backend по HTTP (`http://localhost:8080/graphql`).
+5. Сага или Apollo перехватывает действие, формирует REST или GraphQL запрос на backend (`http://localhost:8080/query` или `/projectPage/...`).
 6. Gin-сервер backend’а принимает запрос, `gqlgen` маршрутизирует его к нужному резолверу.
 7. Резолвер вызывает соответствующий usecase, который:
    - при необходимости проверяет права пользователя,
@@ -275,7 +273,7 @@
   - `src/helpers/lmsSso.js` — генерация `state`, `nonce`, `code_verifier`, `code_challenge` и сборка authorize URL.
 - До заполнения OIDC-параметров (`LMS_OAUTH_AUTHORIZE_URL`, `LMS_OAUTH_CLIENT_ID`, `LMS_OAUTH_REDIRECT_URI`) используется безопасный fallback: прямое открытие LMS URL в новой вкладке.
 - На странице регистрации при ответе backend о дублирующемся email (`email is already used`/`user already exist`) показывается UI-уведомление: «Пользователь с таким email уже зарегистрирован» (`src/sagas/login.js`).
-- **Мои проекты (ученик):** список и карточка в **PROJECT DB** (`scratch_projects`); идентификатор — UUID. Legacy числовые id не резолвятся.
+- **Мои проекты (ученик):** список и карточка в **PROJECT DB** (`scratch_projects`); UUID. Публичный каталог — `/projects/public`, REST `GET /projectPage/public`. Embed-плеер — play-token + `ScratchPlayerEmbed` (:5001).
 
 ### Inbox уведомлений (апрель 2026, статус май 2026)
 

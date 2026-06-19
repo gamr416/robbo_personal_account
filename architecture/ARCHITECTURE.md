@@ -2,67 +2,69 @@
 flowchart LR
   U[User Browser]
 
-  subgraph FE[Frontend: robbo_personal_account_frontend]
-    FEUI[React SPA react-router-dom + redux/saga AntD + styled-components]
-    FESRV[Node/Express server `yarn start` exposes :3030]
+  subgraph FE[Frontend robbo_personal_account_frontend]
+    FEUI[React Apollo + redux-saga AntD]
+    FESRV[Express yarn start :3030]
+    SCRgui[Scratch player :5001]
   end
 
-  subgraph BE[Backend: robbo_personal_account_backend]
-    API[Go app Gin GraphQL /query + REST /api/notifications + /internal/lms]
-    CFG[Config/Env]
-    AUTH[Auth JWT]
-    ORM[GORM]
+  subgraph BE[Backend robbo_personal_account_backend]
+    API[Gin GraphQL POST /query + REST]
+    CFG[config.yml + env]
+    AUTH[JWT + OIDC BFF]
   end
 
-  subgraph DB[Database]
-    PG[(PostgreSQL 13 :5432 robbo_db ЛК)]
-    PGProj[(PostgreSQL 13 Scratch-проекты см. robbo_projects_db)]
+  subgraph DB[Хранилища]
+    PGProj[(Projects Postgres :5433 scratch_*)]
+    LMS[(LMS MySQL :3307 auth_user)]
+    PGLegacy[(Legacy Postgres :5432 — опционально)]
   end
 
   U --> FEUI
-  FEUI -->|HTTP serves bundle| FESRV
-
-  FEUI -->|GraphQL + REST e.g. PUT projectPage| API
-  API -->|SQL via GORM ЛК| ORM --> PG
-  API -->|PROJECT DB проекты Scratch| PGProj
+  FEUI --> FESRV
+  FEUI --> SCRgui
+  FEUI -->|GraphQL + REST| API
+  API --> PGProj
+  API --> LMS
+  API --> PGLegacy
   API --> CFG
   API --> AUTH
 ```
 
 ```mermaid
 flowchart TB
-  subgraph DockerCompose[Docker Compose]
-    subgraph FEc[Frontend compose]
-      FEsvc[web build: . ports: 3030:3030 network_mode: host]
-    end
-
-    subgraph BEc[Backend compose]
-      BEsvc[app build: . ports: 8080:8080 depends_on: postgres(healthy)]
-      PGsvc[postgres image: postgres:13 ports: 5432:5432 volume: postgres_data]
-    end
+  subgraph LocalStack[Локальный стек setup.sh]
+    PP[robbo_projects_db :5433]
+    MySQL[docker-compose.lms_mysql.yml :3307]
+    MockOIDC[docker-compose.oidc.dev.yml :8081]
+    BEapp[rpa2 app :8080]
+    FEweb[frontend web :3030]
+    Scratch[scratch-gui :5001]
   end
 
-  FEsvc -->|calls backend (GraphQL)| BEsvc
-  BEsvc --> PGsvc
+  FEweb --> BEapp
+  BEapp --> PP
+  BEapp --> MySQL
+  BEapp --> MockOIDC
+  FEweb --> Scratch
 ```
 
 ```mermaid
 flowchart LR
   user[UserBrowser] --> lk[LKFrontend]
-  lk -->|new tab| lmsUrl[LMS_URL_online_robbo_ru]
-  lk -->|if OIDC configured authorize code PKCE| idp[IdentityAuth_OIDC]
-  idp -->|auth_code| lmsCb[LMS_Callback]
-  lmsCb -->|token exchange| idp
-  lmsCb --> lmsUi[LMS_UI]
+  lk -->|new tab openLms| lmsUrl[LMS_URL online.robbo.ru]
+  lk -->|BFF login| beOidc[Backend /auth/oidc]
+  beOidc --> idp[Open edX OIDC IdP]
+  lk -->|PKCE вкладка LMS| feCb[Frontend /auth/oidc/callback]
+  feCb --> idp
 ```
 
-Пересборка контейнеров ЛК: фронт — сервис `web` в `robbo_personal_account_frontend` (или дубликат `robbo_personal_account/frontend`, если прод оттуда); бэкенд — сервис `app`, проект compose `rpa2`. После `docker compose build` выполнять `up -d --build` для того же сервиса. Подробнее: `ARCHITECTURE_DETAILED_RU.md` (раздел Docker Compose), `change_log.md`.
+Пересборка контейнеров ЛК: фронт — сервис `web` в `robbo_personal_account_frontend`; бэкенд — сервис `app`, проект `rpa2`. После `build` — `up -d --build`. См. `ARCHITECTURE_DETAILED_RU.md`, `change_log.md`.
 
-ЛК: на `/home` у админов юнита и суперадмина в сайдбаре — кнопка «Отправить уведомление» над меню (см. `ARCHITECTURE_DETAILED_RU.md`, inbox уведомлений).
+**Где править код:** только `robbo_personal_account_frontend/` и `robbo_personal_account_backend/`. `robbo_personal_account/` — монорепо с субмодулями (`setup.sh`); исходный код там не менять.
 
-**Инвентарь функционала (маршруты, API, cutover, долг):** [FUNCTIONALITY_RU.md](FUNCTIONALITY_RU.md).
+**Инвентарь функционала:** [FUNCTIONALITY_RU.md](FUNCTIONALITY_RU.md).
 
-Монорепо-обёртка с субмодулями: [github.com/gamr416/robbo_personal_account](https://github.com/gamr416/robbo_personal_account) — в `README` ссылки на `tree/main` frontend/backend.
+Монорепо: [github.com/gamr416/robbo_personal_account](https://github.com/gamr416/robbo_personal_account).
 
-**БД Scratch-проектов:** каталог [`robbo_projects_db/`](../robbo_projects_db/) — Postgres `:5433`, **3 таблицы** `scratch_*`; DSN `PROJECTS_POSTGRES_DSN`. **Пользователи** — LMS MySQL `LMS_MYSQL_DSN` / `LMS_MYSQL_WRITE_DSN`. См. [LEGACY_POSTGRES_CUTOVER.md](LEGACY_POSTGRES_CUTOVER.md).
-
+**БД:** Projects — [`robbo_projects_db/`](../robbo_projects_db/) (`PROJECTS_POSTGRES_DSN`, `:5433`). Пользователи — LMS MySQL (`LMS_MYSQL_DSN`). Legacy — `legacyPostgres.enabled`. См. [LEGACY_POSTGRES_CUTOVER.md](LEGACY_POSTGRES_CUTOVER.md).

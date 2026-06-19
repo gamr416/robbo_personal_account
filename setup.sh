@@ -45,7 +45,7 @@ setup.sh — развернуть локальный стек ЛК (БД + backe
   GraphQL        http://localhost:8080/query
   Scratch Player http://localhost:5001/player.html
 
-Тестовый вход (LMS MySQL): 1@1 / 123
+Тестовый вход (LMS MySQL): 1@1.ru / 123
 EOF
 }
 
@@ -209,7 +209,7 @@ main() {
   log "[5/5] Frontend React + Scratch player (порты 3030, 5001)..."
   if [[ "$SKIP_BUILD" == false ]]; then
     (cd "$FRONTEND_DIR" && docker compose build scratch-gui web)
-    (cd "$FRONTEND_DIR" && docker compose up -d --force-recreate web)
+    (cd "$FRONTEND_DIR" && docker compose up -d --force-recreate web scratch-gui)
   else
     (cd "$FRONTEND_DIR" && docker compose up -d web)
   fi

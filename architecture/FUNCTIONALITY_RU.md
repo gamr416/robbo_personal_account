@@ -1,4 +1,4 @@
-# Инвентарь функционала ЛК (сверка с кодом, май 2026)
+# Инвентарь функционала ЛК (сверка с кодом, июнь 2026)
 
 Документ фиксирует **фактическое** поведение репозиториев в workspace. Целевая архитектура — в [архитектура_3_сервисов.md](архитектура_3_сервисов.md), [ADR_LK_TWO_DATABASES.md](ADR_LK_TWO_DATABASES.md), [LEGACY_POSTGRES_CUTOVER.md](LEGACY_POSTGRES_CUTOVER.md).
 
@@ -11,11 +11,11 @@
 | `robbo_personal_account_backend/` | Go backend (compose `rpa2`, сервис `app`) |
 | `robbo_personal_account/backend/` | Тот же backend (субмодуль) |
 | `robbo_projects_db/` | PostgreSQL Scratch-проектов (`:5433`, DSN `PROJECTS_POSTGRES_DSN`) |
+| `robboscratch3_gui/` | Scratch embed player (compose `scratch-gui`, :5001) |
+| `robbo-openedx-stack/` | Meta-repo Open edX + Tutor (отдельный контур) |
 | `gamr416/robbo_personal_account` | Монорепо-обёртка с субмодулями |
 
-Связка ЛК ↔ Open edX (каналы HTTP/OAuth, без прямого SQL в рантайме UI): [../lk+lms.md](../lk+lms.md).
-
-Матрица прав по ролям: [../user_roles_capabilities.csv](../user_roles_capabilities.csv), упрощённая — [../user_roles_capabilities_простая_таблица.csv](../user_roles_capabilities_простая_таблица.csv).
+Связка ЛК ↔ Open edX: [LMS_HANDOFF.md](LMS_HANDOFF.md), [ADR_LK_LMS_SSO_OIDC.md](ADR_LK_LMS_SSO_OIDC.md).
 
 ---
 
@@ -41,11 +41,12 @@
 | `/` | Landing | публичный | маркетинг, `/materials/*`, тёмная/светлая тема |
 | `/login` | Login | публичный | OIDC BFF + опционально email/пароль |
 | `/register` | Register | публичный | только регистрация ученика → `POST /auth/sign-up` |
-| `/auth/oidc/callback` | OidcCallback | публичный | PKCE, сохранение LMS identity link |
-| `/home` | Home | все 6 | дашборд, быстрые действия |
+| `/auth/oidc/callback` | OidcCallback | публичный | PKCE вкладки LMS: обмен code на IdP, `localStorage` identity link |
+| `/home` | Home | все 6 | дашборд, быстрые действия (в т.ч. публичные проекты) |
 | `/profile` | Profile | все 6 | свой или peek через `location.state` |
-| `/myprojects` | MyProjects | ученик | пункт в сайдбаре **закомментирован**, маршрут работает |
-| `/projects/:projectPageId` | ProjectPage | ученик | Scratch, `.sb3`, owner-check на backend |
+| `/myprojects` | MyProjects | ученик | пункт «Мои проекты» в сайдбаре ученика (`SideBarData.jsx`) |
+| `/projects/public` | PublicProjects | все 6 | каталог публичных проектов; также ссылка в `HeaderExploreNav` |
+| `/projects/:projectPageId` | ProjectPage | все 6 | просмотр; CRUD — student/unit admin/super admin; embed `ScratchPlayerEmbed` |
 | `/mycourses` | LmsRedirect | все 6 | редирект в LMS (вкладка), не список курсов ЛК |
 | `/courses/:coursePageId` | CoursePage | все 6 | карточка курса, CourseAccess, ссылка на edx-test |
 | `/clients` | Clients | super admin | родители (CRUD) |
@@ -57,29 +58,37 @@
 | `/send-notification` | SendNotification | super admin, unit admin | UI есть, backend user API см. ниже |
 | `/*` | → `/home` | | |
 
-**Сайдбар (активные пункты):** см. `sidebarMenu.js` / `SideBarData.jsx` — по ролям «Главная», «Профиль», «LMS» (внешняя вкладка), для админов юниты/группы/учителя/уведомления; у free listener — «Платежи», «Программа», «Информер» **без маршрутов** (редирект на `/home`).
+**Сайдбар:** `SideBarData.jsx` — по ролям «Главная», «Профиль», у ученика «Мои проекты», «LMS» (внешняя вкладка через `openLms`), для админов юниты/группы/учителя/уведомления; у free listener — «Платежи», «Программа», «Информер» **без маршрутов**.
 
-**Глобально:** кнопка «Помощь» → `https://support.robbo.world/`; i18n `ru` / `en` / `zh`; колокольчик уведомлений в `PageLayout`.
+**Шапка (авторизованная зона):** `HeaderExploreNav` — «Создать» (scratch.ru), «Обзор» → `/projects/public`, «LMS».
+
+**Глобально:** кнопка «Помощь» → `https://support.robbo.world/`; i18n `ru` / `en` / `zh`; колокольчик в `PageLayout`.
+
+**Стек UI:** GraphQL через **Apollo Client** (`graphQL/`, HOC/`useMutation`); проекты — **redux-saga + REST** (`sagas/myProjects.js`, `api/projectPage.js`).
 
 ---
 
 ## Frontend: ключевые сценарии
 
-### Авторизация
-- OIDC: `GET /auth/oidc/status`, `/start`, callback на backend BFF; cookie `lk_session` (имя см. `package/oidc`).
-- Legacy JWT: `localStorage.token`, GraphQL `SingIn` / `SingOut` / `Refresh`.
-- Регистрация: Redux `signUpRequest` → `POST /auth/sign-up` (LMS INSERT `auth_user` + `auth_userprofile`).
-- После входа редирект на `/home` (не на `/`).
+### Авторизация (два OIDC-потока)
+- **BFF вход в ЛК:** `helpers/oidcSession.js` → `GET /auth/oidc/{status,start}` на backend → callback **`http://localhost:8080/auth/oidc/callback`** → cookie-сессия (`package/oidc`, имя cookie в `SessionCookieName`).
+- **Вкладка LMS:** `helpers/lmsSso.js` (PKCE) → IdP authorize → фронт `/auth/oidc/callback` → прямой `POST` на `OIDC_TOKEN_ENDPOINT` → `saveLmsIdentityLink` в `localStorage`.
+- Legacy JWT: `localStorage.token`, GraphQL `SingIn` / `SingOut` / `Refresh`; email/пароль → `POST /auth/sign-in` (`signInLMS`).
+- Регистрация: `POST /auth/sign-up` → LMS INSERT `auth_user` + `auth_userprofile`.
+- После входа редирект на `/home`.
 
 ### Профиль
 - Поля LMS: email, **полное имя** (`fullName` → `auth_userprofile.name`), уровень образования, страна, год рождения, пол, язык.
-- Обновление: GraphQL `UpdateStudent` / `UpdateTeacher` / … / `UpdateProfile`.
-- Родитель: список детей → peek профиля ученика.
-- `DELETE users/` в API есть, в UI не подключён.
+- В cutover: чтение/запись через `users/gateway/lms_profile.go` → `package/lmsdb`.
+- Обновление: GraphQL `UpdateStudent` / `UpdateTeacher` / … (резолверы → delegate → gateway).
+- Родитель: список детей → peek профиля ученика (требует legacy для связей).
 
-### Scratch-проекты (ученик)
-- GraphQL + REST `projectPage/*`; хранение в **Projects Postgres** (`scratch_projects`, версии, audit).
-- Открытие в Scratch по `projectPage.scratchLink`; скачивание `GET /projectPage/:id/download`.
+### Scratch-проекты
+- REST `projectPage/*` + GraphQL; хранение в **Projects Postgres** (`scratch_*`).
+- Публичный каталог: `GET /projectPage/public`.
+- Embed-плеер: `GET /projectPage/:id/play-token`, `GET .../play?token=` (`ScratchPlayerEmbed`, `projectPage/playtoken/`).
+- Скачивание/загрузка: `GET .../download`, `POST .../upload` (multipart `.sb3`).
+- Создание карточки: роли Student, UnitAdmin, SuperAdmin.
 
 ### LMS
 - Меню «LMS» / Home: `openLms()` — новая вкладка, OIDC authorize + PKCE `prompt=none` или fallback URL.
@@ -101,9 +110,25 @@
 | `GET /`, `POST /query` | Playground, GraphQL | основной API организационных сущностей |
 | `/auth/*` | sign-up, sign-in, sign-out, refresh, check-auth | JWT + LMS password |
 | `/auth/oidc/*` | start, callback, logout, status | BFF SSO |
-| `POST /internal/lms/notifications` | ingest LMS | только при `lmsNotifications.enabled` + legacy portal |
-| `/project`, `/projectPage` | CRUD, download `.sb3` | Projects Postgres |
-| `/course/*` | create, get, enrollments, public list, update, delete | прокси к edX REST (`api_urls` в config) |
+| `POST /internal/lms/notifications` | ingest LMS | `lmsNotifications.enabled` (по умолчанию **false**) + legacy portal |
+| `/project` | POST/GET/POST/DELETE | JSON проекта (legacy REST, student) |
+| `/projectPage` | CRUD, `public`, `download`, `upload`, `play-token`, `play` | Projects Postgres |
+| `/course/*` | create, get, enrollments, public list, update, delete | edX REST + legacy courses gateway |
+
+Детали `/projectPage` (из `projectPage/http/handler.go`):
+
+| Метод | Путь | Назначение |
+|-------|------|------------|
+| POST | `/projectPage/` | создать карточку |
+| GET | `/projectPage/public` | публичный каталог |
+| GET | `/projectPage/:id` | карточка (+ `playToken` в ответе) |
+| GET | `/projectPage/:id/play-token` | JWT для embed |
+| GET | `/projectPage/:id/play` | inline `.sb3` (Bearer или `?token=`) |
+| GET | `/projectPage/:id/download` | attachment `.sb3` |
+| POST | `/projectPage/:id/upload` | multipart upload |
+| PUT | `/projectPage/` | обновить метаданные |
+| DELETE | `/projectPage/:projectId` | удалить |
+| GET | `/projectPage/` | список своих (student+) |
 
 ### Закомментированы в `SetupGinRouter` (код есть, не смонтированы)
 
@@ -114,10 +139,10 @@
 | Режим | Поведение |
 |-------|-----------|
 | `legacy_jwt` | Bearer access JWT |
-| `oidc_bff` | cookie/session BFF или Bearer; без сессии — anonymous `user_id=0` |
-| `lms_db` | как oidc_bff + fallback пароль LMS |
+| `oidc_bff` | cookie BFF или Bearer; при `lmsPasswordFallback` — fallthrough на JWT; иначе anonymous `user_id=0` |
+| `lms_db` | как oidc_bff + обязательный fallback пароль LMS |
 
-Пропуск JWT: `/internal/lms/*`, `/auth/oidc/*`.
+Пропуск middleware-логики OIDC/JWT: `/internal/lms/*`, `/auth/oidc/*`. `TokenAuthMiddleware` на engine применяется и к `/query`.
 
 ---
 
@@ -140,7 +165,9 @@
 | **Legacy Postgres** | `postgres.postgresDsn`, `legacyPostgres.enabled` | `*_dbs`, `robbo_portal_*`, курсы-метаданные ЛК | опционально; в compose по умолчанию **выкл** |
 | **Portal** | `portalOutbox.enabled`, gateway | outbox, notifications, user links | только при `legacyPostgres.enabled=true` |
 
-Переменные: `package/config/config.yml`, `.env.example`, `docker-compose.yml` (`rpa2`).
+Переменные: `package/config/config.yml`, `.env.example`, `docker-compose.yml` (`rpa2` — **только** сервис `app`, без Postgres).
+
+Локальный стек: `robbo_personal_account/setup.sh` поднимает Projects DB, `docker-compose.lms_mysql.yml` (:3307), `docker-compose.oidc.dev.yml` (:8081), backend, frontend+scratch.
 
 Скрипты: `scripts/seed_lms_dev_user`, `scripts/backfill_auth_userprofile_name`, `robbo_projects_db/scripts/cleanup_projects_db.sql`.
 
@@ -153,7 +180,8 @@
 | Open edX LMS | ЛК → LMS (SSO) | OIDC BFF `/auth/oidc/*`, фронт PKCE для вкладки LMS |
 | Open edX LMS | LMS → ЛК | ingest `POST /internal/lms/notifications` (контракт ADR) |
 | edX REST | ЛК backend → edx-test.ru | `package/edx`, `api_urls`, client credentials |
-| Scratch editor | ЛК → scratch | `projectPage.scratchLink`, Projects DB BYTEA |
+| Scratch player | ЛК → :5001 | `ScratchPlayerEmbed`, play-token; compose `scratch-gui` |
+| Scratch editor (внешний) | ЛК → scratch.ru | ссылка в `HeaderExploreNav` |
 | Поддержка | ЛК UI → support.robbo.world | фиксированная кнопка |
 
 ---
